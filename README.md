@@ -12,7 +12,7 @@ Settings → Plugins → Available Plugins → Add Source.
 
 Install Tag Suggestions and reload plugins. Remove a hand-copied `plugins/tag-suggestions` folder first, so only the installed copy loads.
 
-Stash reads `index.yml` from that URL and downloads the zip named there. This repository holds the plugin folder that zip is built from: the manifest, the entry script, the scene-page JavaScript, and `decision_tagger`.
+Stash reads `index.yml` from that URL and downloads the zip named there. The plugin folder in `plugins/tag-suggestions` is what that zip contains. A push to `master` publishes the index.
 
 ## Requirements
 
