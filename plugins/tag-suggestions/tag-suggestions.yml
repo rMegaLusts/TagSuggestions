@@ -1,0 +1,83 @@
+name: Tag Suggestions
+description: Suggest Stash tags for a scene with a decision model.
+version: 0.1.0
+url: https://github.com/rMegaLusts/TagSuggestions
+
+exec:
+  - python
+  - "{pluginDir}/tag-suggestions.py"
+interface: raw
+
+settings:
+  server_url:
+    displayName: Server URL
+    description: llama.cpp router base URL for POST /v1/systemone
+    type: STRING
+  model:
+    displayName: Model
+    description: Model id sent to the server; leave blank to omit
+    type: STRING
+  api_key:
+    displayName: API key
+    description: Bearer token for the decision server (stored in plain text in Stash config)
+    type: STRING
+  api_key_env:
+    displayName: API key environment variable
+    description: Fallback env var name when API key is blank (CLI default is SYSTEMONE_API_KEY)
+    type: STRING
+  question_template:
+    displayName: Question template
+    description: "Blank uses the default: Regarding {category}: does this item state or depict {tag}? Must include {category} and {tag}."
+    type: STRING
+  false_criteria:
+    displayName: False criteria
+    description: "Blank uses the default: The item does not state this and does not clearly depict it."
+    type: STRING
+  include_descriptions:
+    displayName: Include descriptions
+    description: Default off. Adds each tag description to the yes criterion. Leave off for Laya; turn on for a model that can use the definition.
+    type: BOOLEAN
+  body_char_budget:
+    displayName: Body character budget
+    description: Default 1000. Characters of the scene details the model reads. 0 sends an empty body.
+    type: NUMBER
+  max_questions_per_request:
+    displayName: Max questions per request
+    description: Default 64. Questions sent in one request. 0 is invalid.
+    type: NUMBER
+  concurrency:
+    displayName: Concurrency
+    description: Default 4. Requests in flight at once. 0 is invalid. The dialog still sends one Request per round trip.
+    type: NUMBER
+  threshold:
+    displayName: Threshold
+    description: "Default 0.5. Minimum score from 0 to 1, for example 0.8. Blank uses the default. 0 keeps every score."
+    type: STRING
+  tag_limit:
+    displayName: Tag limit
+    description: Default 12. Maximum Suggested Tags. An empty field is stored as 0, and 0 uses the default of 12.
+    type: NUMBER
+  category_floor:
+    displayName: Category floor
+    description: Default 0. Suggested Tags reserved per Category before the rest are filled by score. 0 reserves none.
+    type: NUMBER
+  category_cap:
+    displayName: Category cap
+    description: Default 4. Maximum Suggested Tags from one Category. 0 is invalid.
+    type: NUMBER
+  max_retries:
+    displayName: Max retries
+    description: Default 3. Extra attempts after a failed request. 0 means no retries.
+    type: NUMBER
+  retry_backoff_seconds:
+    displayName: Retry backoff seconds
+    description: "Default 0.5. Seconds to wait before a retry, for example 0.5. Blank uses the default. 0 retries immediately."
+    type: STRING
+  timeout_seconds:
+    displayName: Timeout seconds
+    description: Default 120. Seconds before a request is given up. 0 is invalid.
+    type: NUMBER
+
+ui:
+  javascript:
+    - tag-suggestions.js

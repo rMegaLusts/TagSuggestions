@@ -1,0 +1,2 @@
+class TaggingError(Exception):
+    pass
