@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - "tag-suggestions/**"
+      - "plugins/**"
       - "build_site.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:

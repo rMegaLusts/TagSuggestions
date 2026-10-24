@@ -94,8 +94,8 @@ def render_package(manifest: Path, outdir: Path, short: str, date: str) -> str:
 
 def build(root: Path, outdir: Path) -> Path:
     outdir.mkdir(parents=True, exist_ok=True)
-    manifest = root / "tag-suggestions" / "tag-suggestions.yml"
-    manifests = [manifest] if manifest.is_file() else []
+    plugins = root / "plugins"
+    manifests = sorted(plugins.glob("*/*.yml")) if plugins.is_dir() else []
     index = outdir / "index.yml"
     if not manifests:
         index.write_text("[]\n", encoding="utf-8")

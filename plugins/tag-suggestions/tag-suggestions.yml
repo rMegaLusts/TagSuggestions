@@ -1,7 +1,7 @@
 name: Tag Suggestions
 description: Suggest Stash tags for a scene with a decision model.
 version: 0.1.0
-url: https://github.com/rMegaLusts/TagSuggestions
+url: https://github.com/rMegaLusts/stash-plugins
 
 exec:
   - python
