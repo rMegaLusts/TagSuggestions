@@ -12,19 +12,20 @@ settings:
     displayName: Hide audio scenes from Scenes
     description: When on, the main Scenes list excludes audio scenes.
     type: BOOLEAN
-  hide_performers:
+  separate_performers:
     displayName: Performer pages
-    description: When on, performer Scenes tabs exclude audio scenes and add an Audio tab.
+    description: When on, performer Scenes tabs exclude audio scenes and an Audio tab sits beside Scenes.
     type: BOOLEAN
-  hide_studios:
+  separate_studios:
     displayName: Studio pages
-    description: When on, studio Scenes tabs exclude audio scenes and add an Audio tab.
+    description: When on, studio Scenes tabs exclude audio scenes and an Audio tab sits beside Scenes.
     type: BOOLEAN
-  hide_tags:
+  separate_tags:
     displayName: Tag pages
-    description: When on, tag Scenes tabs exclude audio scenes and add an Audio tab.
+    description: When on, tag Scenes tabs exclude audio scenes and an Audio tab sits beside Scenes.
     type: BOOLEAN
 
 ui:
   javascript:
+    - mini-audio-suite-core.js
     - mini-audio-suite.js
