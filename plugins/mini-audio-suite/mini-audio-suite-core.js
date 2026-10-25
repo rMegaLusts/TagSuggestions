@@ -171,9 +171,20 @@
 
   // Stash allows one of AND / OR / NOT on a filter object. Criteria on that
   // object are ANDed with the single sub-filter.
+  // Stash ANDs the free-text q clause onto the scene filter without
+  // wrapping that filter. A top-level OR then outranks q, so a search
+  // still returns every no-video scene. Nesting that OR under AND keeps
+  // the parentheses.
+  function groupOr(filter) {
+    if (filter && filter.OR && !filter.AND && !filter.NOT) {
+      return { AND: filter };
+    }
+    return filter;
+  }
+
   function andFilters(base, extra) {
     if (!present(base)) {
-      return extra;
+      return groupOr(extra);
     }
     if (!present(extra)) {
       return base;

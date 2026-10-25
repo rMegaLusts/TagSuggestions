@@ -5,7 +5,7 @@
   const PluginApi = window.PluginApi;
   const React = PluginApi.React;
   const { Nav, Button } = PluginApi.libraries.Bootstrap;
-  const { NavLink, useLocation } = PluginApi.libraries.ReactRouterDOM;
+  const { useHistory, useLocation } = PluginApi.libraries.ReactRouterDOM;
   const { faHeadphones } = PluginApi.libraries.FontAwesomeSolid;
   const { Icon, LoadingIndicator } = PluginApi.components;
   const { useLoadComponents } = PluginApi.hooks;
@@ -13,6 +13,7 @@
   const h = React.createElement;
 
   const AUDIO_LINK = "mas-audio-tab";
+  const AUDIO_VIEW = "mas_audio";
 
   const entities = {
     performer: {
@@ -87,7 +88,7 @@
 
   function scopedInclude(pageHook) {
     return (filter) => {
-      const cleared = filter.clearCriteria(true);
+      const cleared = filter.clearCriteria(false);
       const scoped = pageHook ? pageHook(cleared) : cleared;
       return core.includeMembership(scoped);
     };
@@ -202,7 +203,7 @@
 
     if (isAudioNavPath(pathname)) {
       return h(Original, Object.assign({}, listProps, {
-        view: undefined,
+        view: listProps.view || AUDIO_VIEW,
         filterHook: compose(core.includeMembership, listProps.filterHook),
       }));
     }
@@ -210,6 +211,7 @@
     if (scope && scope.separate() && audioTabActive(pathname) && listProps.view === scope.view) {
       return h(Original, {
         key: "mas-audio-tab",
+        view: listProps.view,
         alterQuery: false,
         filterHook: scopedInclude(listProps.filterHook),
       });
@@ -258,33 +260,7 @@
         scenesChild.props.className
       : NAV_ITEM_COL;
 
-    const audioLink = h(
-      Nav.Link,
-      {
-        eventKey: AUDIO_ROUTE,
-        as: "div",
-        key: AUDIO_ROUTE,
-        className: colClass,
-      },
-      h(
-        NavLink,
-        {
-          to: AUDIO_ROUTE,
-          exact: true,
-          activeClassName: "active",
-          className: "d-block w-100 text-decoration-none",
-        },
-        h(
-          Button,
-          {
-            as: "span",
-            className: `${NAV_BUTTON_CLASS} w-100`,
-          },
-          h(Icon, { icon: faHeadphones, className: NAV_ICON_CLASS }),
-          h("span", null, "Audio")
-        )
-      )
-    );
+    const audioLink = h(AudioNavItem, { className: colClass, key: AUDIO_ROUTE });
     const scenesIndex = childArray.findIndex((child) => child === scenesChild);
     if (scenesIndex === -1) {
       return childArray.concat([audioLink]);
@@ -294,13 +270,52 @@
     return next;
   }
 
+  function AudioNavItem(props) {
+    const history = useHistory();
+    const location = useLocation();
+    const active = isAudioNavPath(location.pathname);
+
+    return h(
+      Nav.Link,
+      {
+        eventKey: AUDIO_ROUTE,
+        as: "div",
+        className: props.className,
+      },
+      h(
+        Button,
+        {
+          href: AUDIO_ROUTE,
+          active: active,
+          className: NAV_BUTTON_CLASS,
+          onClick: (event) => {
+            if (
+              event.defaultPrevented ||
+              event.button !== 0 ||
+              event.metaKey ||
+              event.altKey ||
+              event.ctrlKey ||
+              event.shiftKey
+            ) {
+              return;
+            }
+            event.preventDefault();
+            history.push(AUDIO_ROUTE);
+          },
+        },
+        h(Icon, { icon: faHeadphones, className: NAV_ICON_CLASS }),
+        h("span", null, "Audio")
+      )
+    );
+  }
+
   function AudioScenesPage() {
     const scenesLoading = useLoadComponents([loadSceneList]);
     const FilteredSceneList = PluginApi.components.FilteredSceneList;
     if (scenesLoading || !FilteredSceneList) {
       return h(LoadingIndicator);
     }
-    return h(FilteredSceneList, { alterQuery: true });
+    return h(FilteredSceneList, { alterQuery: true, view: AUDIO_VIEW });
   }
 
   PluginApi.patch.before("MainNavBar.MenuItems", (props) => [
