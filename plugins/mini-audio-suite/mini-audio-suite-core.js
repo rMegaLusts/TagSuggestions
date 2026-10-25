@@ -25,6 +25,7 @@
       separate_tags: false,
     },
     tagState: { rootId: null, resolvedName: "" },
+    ui: { abbreviateCounters: false },
     audioTab: { pathname: "", on: false },
     listeners: new Set(),
   };
@@ -95,6 +96,23 @@
     };
   }
 
+  function parseUi(ui) {
+    let value = ui;
+    if (typeof value === "string") {
+      try {
+        value = JSON.parse(value);
+      } catch (_err) {
+        value = {};
+      }
+    }
+    if (!value || typeof value !== "object") {
+      value = {};
+    }
+    return {
+      abbreviateCounters: parseBool(value.abbreviateCounters),
+    };
+  }
+
   function configuredTagName() {
     const trimmed = (store.settings.tag_name || "").trim();
     return trimmed || "Audio";
@@ -149,9 +167,10 @@
   async function refreshConfiguration() {
     try {
       const data = await callGQL({
-        query: `query { configuration { plugins } }`,
+        query: `query { configuration { plugins ui } }`,
       });
       store.settings = parseSettings(data.configuration.plugins);
+      store.ui = parseUi(data.configuration.ui);
       await resolveAudioTag();
     } catch (err) {
       console.error("[mini-audio-suite]", err);
@@ -243,6 +262,16 @@
     return patchMakeFilter(filter, (base) => andFilters(base, { NOT: membershipFilter() }));
   }
 
+  async function countMembership(extra) {
+    const data = await callGQL({
+      query: `query MasAudioCount($scene_filter: SceneFilterType!) {
+        findScenes(filter: { per_page: 1 }, scene_filter: $scene_filter) { count }
+      }`,
+      variables: { scene_filter: andFilters(extra, membershipFilter()) },
+    });
+    return data.findScenes?.count ?? 0;
+  }
+
   function sceneLacksRealVideo(scene) {
     const files = scene?.files ?? [];
     if (files.length === 0) {
@@ -286,8 +315,10 @@
     store,
     subscribe,
     getSnapshot,
+    criterion,
     includeMembership,
     excludeMembership,
+    countMembership,
     emit,
   };
 })();

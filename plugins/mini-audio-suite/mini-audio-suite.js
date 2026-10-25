@@ -98,6 +98,149 @@
     return (filter) => outer(inner ? inner(filter) : filter);
   }
 
+  const audioCounts = { key: "", value: null };
+  let countGeneration = 0;
+
+  function childDepth(scope) {
+    if (scope.kind === "performer") {
+      return 0;
+    }
+    const box = document.getElementById("showSubContent");
+    if (box instanceof HTMLInputElement && box.checked) {
+      return -1;
+    }
+    return 0;
+  }
+
+  function countKey(scope, depth) {
+    return [scope.kind, scope.id, store.tagState.rootId || "", depth].join(":");
+  }
+
+  function entityCriterion(scope, depth) {
+    if (scope.kind === "performer") {
+      return {
+        performers: {
+          value: [scope.id],
+          modifier: core.criterion("IncludesAll"),
+        },
+      };
+    }
+    if (scope.kind === "studio") {
+      return {
+        studios: {
+          value: [scope.id],
+          modifier: core.criterion("Includes"),
+          depth: depth,
+        },
+      };
+    }
+    return {
+      tags: {
+        value: [scope.id],
+        modifier: core.criterion("IncludesAll"),
+        depth: depth,
+      },
+    };
+  }
+
+  function formatCount(count, abbreviate) {
+    if (!abbreviate || count < 1000) {
+      return count.toLocaleString();
+    }
+    const units = ["", "K", "M", "B"];
+    let unit = 0;
+    let digits = 0;
+    let value = count;
+    while (value >= 1000 && unit + 1 < units.length) {
+      value /= 1000;
+      unit += 1;
+      digits = 1;
+    }
+    const size = value.toLocaleString(undefined, { maximumFractionDigits: digits });
+    return `${size}${units[unit]}`;
+  }
+
+  function counterClassName() {
+    const sample = document.querySelector(".nav-tabs .nav-link .badge:not(.mas-audio-count)");
+    if (sample) {
+      return `${sample.className} mas-audio-count`;
+    }
+    return "badge badge-pill badge-secondary left-spacing mas-audio-count";
+  }
+
+  function shownAudioCount() {
+    const scope = entityFromPath(window.location.pathname);
+    if (!scope || !scope.separate()) {
+      return null;
+    }
+    const key = countKey(scope, childDepth(scope));
+    if (audioCounts.key !== key) {
+      return null;
+    }
+    return audioCounts.value;
+  }
+
+  function renderAudioCount(link) {
+    const count = shownAudioCount();
+    const badge = link.querySelector(":scope > .mas-audio-count");
+    if (count == null || count === 0) {
+      badge?.remove();
+      return;
+    }
+    const text = formatCount(count, store.ui.abbreviateCounters);
+    const value = String(count);
+    if (badge) {
+      if (badge.textContent !== text) {
+        badge.textContent = text;
+      }
+      if (badge.getAttribute("data-value") !== value) {
+        badge.setAttribute("data-value", value);
+      }
+      return;
+    }
+    const created = document.createElement("span");
+    created.className = counterClassName();
+    created.textContent = text;
+    created.setAttribute("data-value", value);
+    link.appendChild(created);
+  }
+
+  function paintAudioTabs() {
+    const pathname = window.location.pathname;
+    const scope = entityFromPath(pathname);
+    const enabled = !!(scope && scope.separate());
+    const active = enabled && audioTabActive(pathname);
+    syncAudioTabs(enabled, active);
+  }
+
+  function loadAudioCount(scope) {
+    const generation = ++countGeneration;
+    if (!store.ready || !scope || !scope.separate()) {
+      audioCounts.key = "";
+      audioCounts.value = null;
+      return;
+    }
+    const depth = childDepth(scope);
+    const key = countKey(scope, depth);
+    if (audioCounts.key !== key) {
+      audioCounts.value = null;
+    }
+    audioCounts.key = key;
+    core.countMembership(entityCriterion(scope, depth)).then(
+      (count) => {
+        if (generation !== countGeneration) {
+          return;
+        }
+        audioCounts.key = key;
+        audioCounts.value = count;
+        paintAudioTabs();
+      },
+      (err) => {
+        console.error("[mini-audio-suite]", err);
+      }
+    );
+  }
+
   function scenesLink(nav) {
     const item = nav.querySelector(":scope > .nav-item, :scope > .nav-link");
     if (!item) {
@@ -142,6 +285,7 @@
         }
       }
       link.classList.toggle("active", active);
+      renderAudioCount(link);
       const scenes = scenesLink(nav);
       if (active && scenes && scenes !== link) {
         scenes.classList.remove("active");
@@ -162,7 +306,17 @@
       const scope = entityFromPath(location.pathname);
       const enabled = !!(scope && scope.separate());
       const active = enabled && audioTabActive(location.pathname);
-      const run = () => syncAudioTabs(enabled, active);
+      loadAudioCount(scope);
+      const run = () => {
+        const live = entityFromPath(location.pathname);
+        if (live && live.separate() && store.ready) {
+          const key = countKey(live, childDepth(live));
+          if (key !== audioCounts.key) {
+            loadAudioCount(live);
+          }
+        }
+        syncAudioTabs(enabled, active);
+      };
       run();
       const observer = new MutationObserver(run);
       observer.observe(document.body, { childList: true, subtree: true });

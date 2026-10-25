@@ -14,15 +14,15 @@ settings:
     type: BOOLEAN
   separate_performers:
     displayName: Performer pages
-    description: When on, performer Scenes tabs exclude audio scenes and an Audio tab sits beside Scenes.
+    description: When on, performer Scenes tabs exclude audio scenes and an Audio tab with a count sits beside Scenes.
     type: BOOLEAN
   separate_studios:
     displayName: Studio pages
-    description: When on, studio Scenes tabs exclude audio scenes and an Audio tab sits beside Scenes.
+    description: When on, studio Scenes tabs exclude audio scenes and an Audio tab with a count sits beside Scenes.
     type: BOOLEAN
   separate_tags:
     displayName: Tag pages
-    description: When on, tag Scenes tabs exclude audio scenes and an Audio tab sits beside Scenes.
+    description: When on, tag Scenes tabs exclude audio scenes and an Audio tab with a count sits beside Scenes.
     type: BOOLEAN
 
 ui:
