@@ -7,7 +7,9 @@
   const { Nav } = PluginApi.libraries.Bootstrap;
   const { NavLink, useLocation } = PluginApi.libraries.ReactRouterDOM;
   const { faHeadphones } = PluginApi.libraries.FontAwesomeSolid;
-  const { FilteredSceneList, Icon, LoadingIndicator } = PluginApi.components;
+  const { Icon, LoadingIndicator } = PluginApi.components;
+  const { useLoadComponents } = PluginApi.hooks;
+  const { SceneList: loadSceneList } = PluginApi.loadableComponents;
   const h = React.createElement;
 
   const AUDIO_LINK = "mas-audio-tab";
@@ -264,6 +266,11 @@
   }
 
   function AudioScenesPage() {
+    const scenesLoading = useLoadComponents([loadSceneList]);
+    const FilteredSceneList = PluginApi.components.FilteredSceneList;
+    if (scenesLoading || !FilteredSceneList) {
+      return h(LoadingIndicator);
+    }
     return h(FilteredSceneList, { alterQuery: true });
   }
 
