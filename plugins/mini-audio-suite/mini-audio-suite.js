@@ -314,9 +314,13 @@
   );
 
   function mountController(pageName) {
-    PluginApi.patch.after(pageName, (_props, page) =>
-      h(React.Fragment, null, h(EntityAudioController), page)
-    );
+    // Stash calls patched components as (props, legacyContext) and appends the
+    // render result last. The legacy context is an empty object; rendering it
+    // is React error #31.
+    PluginApi.patch.after(pageName, function () {
+      const page = arguments[arguments.length - 1];
+      return h(React.Fragment, null, h(EntityAudioController), page);
+    });
   }
 
   mountController("PerformerPage");
