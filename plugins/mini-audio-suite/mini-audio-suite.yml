@@ -1,0 +1,30 @@
+name: Mini Audio Suite
+description: Audio scene navigation, list filtering, and player stream selection.
+version: 0.1.0
+url: https://github.com/rMegaLusts/stash-plugins
+
+settings:
+  tag_name:
+    displayName: Audio tag name
+    description: Tag that marks audio scenes. Leave blank to use Audio.
+    type: STRING
+  hide_scenes:
+    displayName: Hide audio scenes from Scenes
+    description: When on, the main Scenes list excludes audio scenes.
+    type: BOOLEAN
+  hide_performers:
+    displayName: Performer pages
+    description: When on, performer Scenes tabs exclude audio scenes and add an Audio tab.
+    type: BOOLEAN
+  hide_studios:
+    displayName: Studio pages
+    description: When on, studio Scenes tabs exclude audio scenes and add an Audio tab.
+    type: BOOLEAN
+  hide_tags:
+    displayName: Tag pages
+    description: When on, tag Scenes tabs exclude audio scenes and add an Audio tab.
+    type: BOOLEAN
+
+ui:
+  javascript:
+    - mini-audio-suite.js
