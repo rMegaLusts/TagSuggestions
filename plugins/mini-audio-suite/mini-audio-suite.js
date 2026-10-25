@@ -4,7 +4,7 @@
 
   const PluginApi = window.PluginApi;
   const React = PluginApi.React;
-  const { Nav } = PluginApi.libraries.Bootstrap;
+  const { Nav, Button } = PluginApi.libraries.Bootstrap;
   const { NavLink, useLocation } = PluginApi.libraries.ReactRouterDOM;
   const { faHeadphones } = PluginApi.libraries.FontAwesomeSolid;
   const { Icon, LoadingIndicator } = PluginApi.components;
@@ -33,7 +33,12 @@
   };
 
   function useRevision() {
-    return React.useSyncExternalStore(core.subscribe, core.getSnapshot, core.getSnapshot);
+    const [revision, setRevision] = React.useState(() => core.getSnapshot());
+    React.useEffect(
+      () => core.subscribe(() => setRevision(core.getSnapshot())),
+      []
+    );
+    return revision;
   }
 
   function entityFromPath(pathname) {
@@ -234,29 +239,53 @@
     return h(Original, listProps);
   }
 
+  const NAV_ITEM_COL =
+    "col-4 col-sm-3 col-md-2 col-lg-auto";
+  const NAV_BUTTON_CLASS =
+    "minimal p-4 p-xl-2 d-flex d-xl-inline-block flex-column justify-content-between align-items-center";
+  const NAV_ICON_CLASS = "nav-menu-icon d-block d-xl-inline mb-2 mb-xl-0";
+
   function injectNavAfterScenes(children) {
     const childArray = React.Children.toArray(children);
+    const scenesChild = childArray.find((child) => {
+      if (!child || !child.props) {
+        return false;
+      }
+      return child.props.eventKey === "/scenes" || child.props.href === "/scenes";
+    });
+    const colClass =
+      scenesChild?.props?.className?.includes("col-") ?
+        scenesChild.props.className
+      : NAV_ITEM_COL;
+
     const audioLink = h(
       Nav.Link,
       {
         eventKey: AUDIO_ROUTE,
         as: "div",
         key: AUDIO_ROUTE,
-        className: "col-4 col-sm-3 col-md-2 col-lg-auto",
+        className: colClass,
       },
       h(
         NavLink,
-        { to: AUDIO_ROUTE, className: "nav-link", activeClassName: "active" },
-        h(Icon, { icon: faHeadphones }),
-        h("span", null, "Audio")
+        {
+          to: AUDIO_ROUTE,
+          exact: true,
+          activeClassName: "active",
+          className: "d-block w-100 text-decoration-none",
+        },
+        h(
+          Button,
+          {
+            as: "span",
+            className: `${NAV_BUTTON_CLASS} w-100`,
+          },
+          h(Icon, { icon: faHeadphones, className: NAV_ICON_CLASS }),
+          h("span", null, "Audio")
+        )
       )
     );
-    const scenesIndex = childArray.findIndex((child) => {
-      if (!child || !child.props) {
-        return false;
-      }
-      return child.props.eventKey === "/scenes" || child.props.href === "/scenes";
-    });
+    const scenesIndex = childArray.findIndex((child) => child === scenesChild);
     if (scenesIndex === -1) {
       return childArray.concat([audioLink]);
     }
