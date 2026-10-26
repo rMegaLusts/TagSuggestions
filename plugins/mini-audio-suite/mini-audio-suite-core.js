@@ -8,8 +8,10 @@
   const CRITERION = {
     GreaterThan: "GREATER_THAN",
     NotNull: "NOT_NULL",
+    IsNull: "IS_NULL",
     Includes: "INCLUDES",
     IncludesAll: "INCLUDES_ALL",
+    Excludes: "EXCLUDES",
     Equals: "EQUALS",
     MatchesRegex: "MATCHES_REGEX",
   };
@@ -24,7 +26,7 @@
       separate_studios: false,
       separate_tags: false,
     },
-    tagState: { rootId: null, resolvedName: "" },
+    tagState: { rootId: null, resolvedName: "", descendantIds: [] },
     ui: { abbreviateCounters: false },
     audioTab: { pathname: "", on: false },
     listeners: new Set(),
@@ -131,6 +133,35 @@
     return data.findTags?.tags ?? [];
   }
 
+  async function findAllTagIds(tagFilter) {
+    const ids = [];
+    let page = 1;
+    let count = Infinity;
+    while (ids.length < count) {
+      const data = await callGQL({
+        query: `query FindMasTagIds($filter: FindFilterType!, $tag_filter: TagFilterType!) {
+          findTags(filter: $filter, tag_filter: $tag_filter) { count tags { id } }
+        }`,
+        variables: {
+          filter: { per_page: 500, page },
+          tag_filter: tagFilter,
+        },
+      });
+      const tags = data.findTags?.tags ?? [];
+      count = data.findTags?.count ?? tags.length;
+      for (const tag of tags) {
+        if (tag?.id != null) {
+          ids.push(tag.id);
+        }
+      }
+      if (tags.length === 0 || page > 100) {
+        break;
+      }
+      page += 1;
+    }
+    return ids;
+  }
+
   function pickTag(tags, name) {
     const folded = name.toLowerCase();
     return (tags ?? []).find((tag) => tag.name && tag.name.toLowerCase() === folded) ?? null;
@@ -158,9 +189,23 @@
       }
       match = pickTag(tags, name);
     }
+    let descendantIds = [];
+    if (match) {
+      try {
+        descendantIds = await findAllTagIds({
+          parents: {
+            value: [match.id],
+            modifier: criterion("Includes"),
+            depth: -1,
+          },
+        });
+      } catch (err) {
+        console.error("[mini-audio-suite]", err);
+      }
+    }
     store.tagState = match
-      ? { rootId: match.id, resolvedName: match.name }
-      : { rootId: null, resolvedName: name };
+      ? { rootId: match.id, resolvedName: match.name, descendantIds }
+      : { rootId: null, resolvedName: name, descendantIds: [] };
     return store.tagState;
   }
 
@@ -246,6 +291,145 @@
     };
   }
 
+  // Stash joins a tags value as scene_tag and that criterion's excludes as
+  // scene_tag2, then discards a later join with the same alias. Two tags
+  // criteria in one scene filter both test the first join, so a tag filter
+  // stops matching the tags the user chose. The audio tag test has to use
+  // whichever of those two aliases is still free.
+  function collectTags(filter, found) {
+    const tags = found ?? [];
+    if (!filter || typeof filter !== "object") {
+      return tags;
+    }
+    if (filter.tags) {
+      tags.push(filter.tags);
+    }
+    collectTags(filter.AND, tags);
+    collectTags(filter.OR, tags);
+    collectTags(filter.NOT, tags);
+    return tags;
+  }
+
+  function modifierIs(tags, name) {
+    return tags?.modifier === criterion(name);
+  }
+
+  function usesExcludeSlot(tags) {
+    if (modifierIs(tags, "Excludes")) {
+      return true;
+    }
+    return Array.isArray(tags?.excludes) && tags.excludes.length > 0;
+  }
+
+  function usesValueSlot(tags) {
+    if (modifierIs(tags, "IsNull") || modifierIs(tags, "NotNull")) {
+      return true;
+    }
+    if (modifierIs(tags, "Excludes")) {
+      return false;
+    }
+    return Array.isArray(tags?.value) && tags.value.length > 0;
+  }
+
+  function appendIds(list, ids) {
+    const next = Array.isArray(list) ? list.slice() : [];
+    const seen = new Set(next.map((id) => String(id)));
+    for (const id of ids) {
+      const key = String(id);
+      if (!seen.has(key)) {
+        seen.add(key);
+        next.push(id);
+      }
+    }
+    return next;
+  }
+
+  function audioTreeIds(depth) {
+    const rootId = store.tagState.rootId;
+    if (!rootId) {
+      return [];
+    }
+    if (depth === -1) {
+      return [rootId];
+    }
+    return appendIds([rootId], store.tagState.descendantIds ?? []);
+  }
+
+  function audioExcludesCriterion() {
+    return {
+      value: [store.tagState.rootId],
+      modifier: criterion("Excludes"),
+      depth: -1,
+    };
+  }
+
+  function notNoVideo() {
+    return { NOT: noVideoFilter() };
+  }
+
+  // NOT (lacks the audio tag AND NOT no-video) = audio tag OR no video.
+  // The lacks-audio test is an excludes join, so it does not reuse scene_tag.
+  function hasAudioOrNoVideoViaExcludeSlot() {
+    return {
+      NOT: {
+        tags: audioExcludesCriterion(),
+        AND: notNoVideo(),
+      },
+    };
+  }
+
+  function excludeAudioTagsAndNoVideo() {
+    return {
+      tags: audioExcludesCriterion(),
+      AND: notNoVideo(),
+    };
+  }
+
+  function mergeAudioExcludes(tagsList) {
+    for (const tags of tagsList) {
+      if (!usesExcludeSlot(tags)) {
+        continue;
+      }
+      const depth = typeof tags.depth === "number" ? tags.depth : 0;
+      const ids = audioTreeIds(depth);
+      if (modifierIs(tags, "Excludes")) {
+        tags.value = appendIds(tags.value, ids);
+      } else {
+        tags.excludes = appendIds(tags.excludes, ids);
+      }
+    }
+  }
+
+  function withMembership(base, mode) {
+    if (!store.tagState.rootId) {
+      return andFilters(base, mode === "include" ? noVideoFilter() : notNoVideo());
+    }
+    const tags = collectTags(base);
+    if (tags.length === 0) {
+      const extra = mode === "include" ? membershipFilter() : { NOT: membershipFilter() };
+      return andFilters(base, extra);
+    }
+    const excludeTaken = tags.some(usesExcludeSlot);
+    const valueTaken = tags.some(usesValueSlot);
+    if (mode === "exclude") {
+      if (!excludeTaken) {
+        return andFilters(base, excludeAudioTagsAndNoVideo());
+      }
+      mergeAudioExcludes(tags);
+      return andFilters(base, notNoVideo());
+    }
+    if (!excludeTaken) {
+      return andFilters(base, hasAudioOrNoVideoViaExcludeSlot());
+    }
+    if (!valueTaken) {
+      return andFilters(base, membershipFilter());
+    }
+    console.error(
+      "[mini-audio-suite] tag filter already uses both tag joins; audio tag membership was not applied"
+    );
+    return base;
+  }
+
   function patchMakeFilter(filter, transform) {
     const original = filter.makeFilter.bind(filter);
     filter.makeFilter = function masMakeFilter() {
@@ -255,11 +439,11 @@
   }
 
   function includeMembership(filter) {
-    return patchMakeFilter(filter, (base) => andFilters(base, membershipFilter()));
+    return patchMakeFilter(filter, (base) => withMembership(base, "include"));
   }
 
   function excludeMembership(filter) {
-    return patchMakeFilter(filter, (base) => andFilters(base, { NOT: membershipFilter() }));
+    return patchMakeFilter(filter, (base) => withMembership(base, "exclude"));
   }
 
   async function countMembership(extra) {
@@ -267,7 +451,7 @@
       query: `query MasAudioCount($scene_filter: SceneFilterType!) {
         findScenes(filter: { per_page: 1 }, scene_filter: $scene_filter) { count }
       }`,
-      variables: { scene_filter: andFilters(extra, membershipFilter()) },
+      variables: { scene_filter: withMembership(extra, "include") },
     });
     return data.findScenes?.count ?? 0;
   }
